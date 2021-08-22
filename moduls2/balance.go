@@ -21,7 +21,7 @@ func transfer(amount int, source, dest *account) {
 	source.balance -= amount
 	fmt.Printf("✔️: %s\n", fmt.Sprintf("%v %v", source, dest))
 }
-func main() {
+func main2() {
 	var wg sync.WaitGroup
 	mu := sync.Mutex{}
 	wg.Add(2)
