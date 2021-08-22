@@ -24,7 +24,7 @@ func transfer(amount int, source, dest *account) {
 	source.balance -= amount
 	fmt.Printf("✔️: %s\n", fmt.Sprintf("%v %v", source, dest))
 }
-func main() {
+func main3() {
 	signal := make(chan struct{})
 	transaction := make(chan *backOperation)
 
