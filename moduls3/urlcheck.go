@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 )
 
 var urls = []string{
@@ -11,28 +13,29 @@ var urls = []string{
 	"https://www.youtube.com/",
 }
 
-func main2() {
+func main() {
 	fetchConcurrent(urls)
 }
 
-func fetchSequencial(urls []string) {
-	for _, url := range urls {
-		fetch(url)
-	}
-}
 func fetchConcurrent(urls []string) {
-	signal := make(chan struct{})
+	done := make(chan struct{})
 
 	for _, u := range urls {
 		go func(url string) {
 			fetch(url)
-			signal <- struct{}{}
+			select {
+			case <-done:
+				return
+			default:
+				fmt.Println("Time exced...", url)
+			}
 		}(u)
 	}
 
-	<-signal
-	<-signal
-	<-signal
+	select {
+	case <-time.After(time.Second * 1):
+		close(done)
+	}
 }
 
 func fetch(url string) {

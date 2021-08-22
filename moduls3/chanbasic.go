@@ -2,7 +2,7 @@ package main
 
 import "fmt"
 
-func main() {
+func main2() {
 	num := make(chan int)
 	signal := make(chan struct{})
 	go receive(signal, num)
