@@ -3,8 +3,14 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
+)
+
+const (
+	maxMessageSize = 512
+	writeWait      = 10 * time.Second
 )
 
 var upgrader = websocket.Upgrader{
@@ -24,9 +30,44 @@ type Client struct {
 	queueMessage chan Message
 }
 
-func (c *Client) writeWS() {}
+func (c *Client) writeWS() {
+	defer func() {
+		c.conn.Close()
+	}()
+	for {
+		select {
+		case message, isOpen := <-c.queueMessage:
+			if !isOpen {
+				return
+			}
+			c.conn.SetReadDeadline(time.Now().Add(writeWait))
 
-func (c *Client) readWS() {}
+			if err := c.conn.WriteJSON(message); err != nil {
+				log.Println("can`t get the websocket connection: ", err)
+				return
+			}
+		}
+	}
+}
+
+func (c *Client) readWS() {
+	defer func() {
+		c.hub.unregister <- c
+		c.conn.Close()
+	}()
+	c.conn.SetReadLimit(maxMessageSize)
+	for {
+		message := Message{}
+		if err := c.conn.ReadJSON(&message); err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Println("can`t get the websocket connection: ", err)
+
+			}
+			return
+		}
+		c.hub.broadcast <- message
+	}
+}
 
 func handleWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	nickname := r.URL.Query()["nickname"]
