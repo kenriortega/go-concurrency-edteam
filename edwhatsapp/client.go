@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -11,6 +12,8 @@ import (
 const (
 	maxMessageSize = 512
 	writeWait      = 10 * time.Second
+	pingPeriod     = time.Minute
+	pongWait       = pingPeriod + (10 * time.Second)
 )
 
 var upgrader = websocket.Upgrader{
@@ -31,7 +34,9 @@ type Client struct {
 }
 
 func (c *Client) writeWS() {
+	ticker := time.NewTicker(pingPeriod)
 	defer func() {
+		ticker.Stop()
 		c.conn.Close()
 	}()
 	for {
@@ -46,6 +51,12 @@ func (c *Client) writeWS() {
 				log.Println("can`t get the websocket connection: ", err)
 				return
 			}
+		case <-ticker.C:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.PingMessage, []byte("Ping")); err != nil {
+				log.Printf("it can`t write the ping message: %v\n", err)
+				return
+			}
 		}
 	}
 }
@@ -56,6 +67,14 @@ func (c *Client) readWS() {
 		c.conn.Close()
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
+	c.conn.SetWriteDeadline(time.Now().Add(pongWait))
+
+	c.conn.SetPongHandler(func(ping string) error {
+		fmt.Println("Pong: ", c.nickname, ping)
+		c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
 	for {
 		message := Message{}
 		if err := c.conn.ReadJSON(&message); err != nil {
